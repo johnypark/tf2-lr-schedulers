@@ -33,7 +33,7 @@ class WarmUp:
         
     def total_steps(self):
         return self.step_size
-            
+ 
 class StepDecrease:
     
     def __init__(self,
@@ -69,7 +69,6 @@ class StepDecrease:
         step = tf.cond( tf.rank(step) == 0,
             lambda: tf.expand_dims(step, axis = 0),
             lambda: step)
-        step_shape = tf.shape(step)
         compare = list()
         mask = list()
         compare += [step < self.change_at[0]]
@@ -81,11 +80,6 @@ class StepDecrease:
         compare = [tf.cast(ten, dtype = self.dtype) for ten in compare]
         mask += [tf.math.add_n(compare)<1]
         mask_range = tf.range(len(self.change_at)+1)
-        #lr_segments = list(
-        #   map(
-        #    lambda idx: self.scale_func(idx = idx, scale = self.scale, mask_list = mask),
-        #    mask_range)
-        #    )
         lr_segments = tf.map_fn(
             fn = lambda idx: self.scale_func(
                 idx = idx, 
@@ -93,10 +87,8 @@ class StepDecrease:
                 mask_list = mask),
             elems = mask_range,
             dtype=tf.float32)
-
-        output = tf.ones(shape = step_shape)
-        for val_segment in lr_segments:
-          output *= val_segment
+        
+        output = tf.math.reduce_prod(lr_segments, axis = 0)
         output *= self.mLR
         return output
     

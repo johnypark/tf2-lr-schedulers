@@ -97,8 +97,10 @@ class StepDecrease:
     
     def total_steps(self):
         return self.step_size
-    
 
+
+#https://stackoverflow.com/questions/75323974/performance-difference-between-tf-boolean-mask-and-tf-gather-tf-where
+# tf.where + tf.gather is much better than the tf.boolean_mask
 def apply_funcs2intervals(step, 
                          list_interval,
                          list_funcs,
@@ -118,27 +120,26 @@ def apply_funcs2intervals(step,
     curr_thres += [list_interval[0]]
     compare += [step < curr_thres[0]]
     mask += [step < curr_thres[0]]
-    mask_shape = step.shape
-    mask[0].set_shape(mask_shape)
-    masked_step = tf.boolean_mask(step, mask[0])
+    where = tf.where(step < curr_thres[0])
+    masked_step = tf.gather(step, where)
     func_output += [list_funcs[0](masked_step)]
     
     for idx in range(1, len(list_interval)):
         curr_thres += [curr_thres[idx-1] + list_interval[idx]]
         compare += [step < curr_thres[idx]]
-        curr_mask = compare[idx] ^ compare[idx - 1]
-        curr_mask.set_shape(mask_shape)
-        masked_step = tf.boolean_mask(step, curr_mask)
+        curr_mask = tf.where(compare[idx] ^ compare[idx - 1])
+        masked_step = tf.gather(step, curr_mask)
         masked_step = masked_step - curr_thres[idx-1]
         func_output += [list_funcs[idx](masked_step)]
         mask += [curr_mask]
-        
     compare = [tf.cast(ele, dtype = data_type) for ele in compare]
     final_mask = tf.math.add_n(compare) < 1
+    final_mask = tf.where(final_mask)
     mask += [final_mask]
-    masked_step = tf.boolean_mask(step, final_mask)
+    masked_step = tf.gather(step, final_mask)
     masked_step = masked_step - curr_thres[idx-1]
     func_output += [list_funcs[idx](masked_step)]
+      
     return tf.concat(func_output, axis =0)
   
   

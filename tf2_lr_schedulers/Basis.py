@@ -118,13 +118,13 @@ class ConnectLRs:
         
 
 def Goyal_LR(step, steps_per_epoch, init_LR =0):
-    wp = WarmUp(init_LR = init_LR,
+    initial = WarmUp(init_LR = init_LR,
                 max_LR = 0.1,
                 step_size = 5*steps_per_epoch)
-    step = StepDecrease(max_LR = 0.1, 
+    subseq = StepDecrease(max_LR = 0.1, 
                         step_size = 100*steps_per_epoch,
                         change_at = [30, 60, 90]*steps_per_epoch)
-    lr_scheduler = ConnectLRs([wp, step])
+    lr_scheduler = ConnectLRs([initial, subseq])
     return lr_scheduler(step)
 
 

@@ -56,8 +56,7 @@ class StepDecrease:
         self.dtype = cls_dtype
         self.scale = scale
        
-        
-        
+    
     def __call__(self, step):
         step = tf.constant(step)
         step_shape = tf.shape(step)
@@ -84,11 +83,10 @@ class StepDecrease:
           output *= val_segment
         output *= self.mLR
         return output
-        #return tf.math.add_n(sum_up)
     
     def get_config(self):
         return {
-        "initial_learning_rate": self.iLR,
+        "inital_learning_rate": self.mLR,
         "step_size": self.step_size}
     
     def total_steps(self):

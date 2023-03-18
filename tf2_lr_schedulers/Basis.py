@@ -80,11 +80,19 @@ class StepDecrease:
         compare = [tf.cast(ten, dtype = self.dtype) for ten in compare]
         mask += [tf.math.add_n(compare)<1]
         mask_range = tf.range(len(self.change_at)+1)
-        lr_segments = list(
-           map(
-            lambda idx: self.scale_func(idx = idx, scale = self.scale, mask_list = mask),
-            mask_range)
-            )
+        #lr_segments = list(
+        #   map(
+        #    lambda idx: self.scale_func(idx = idx, scale = self.scale, mask_list = mask),
+        #    mask_range)
+        #    )
+        lr_segments = tf.map_fn(
+            fn = lambda idx: self.scale_func(
+                idx = idx, 
+                scale = self.scale, 
+                mask_list = mask),
+            elems = mask_range,
+            dtype=tf.float32)
+
         output = tf.ones(shape = step_shape)
         for val_segment in lr_segments:
           output *= val_segment

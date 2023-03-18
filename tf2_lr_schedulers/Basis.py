@@ -110,8 +110,11 @@ def apply_funcs2intervals(step,
     mask = list()
     func_output = list()
     curr_thres = list()
-    if tf.rank(step) == 0:
-            step = tf.expand_dims(step, axis = 0)
+    tf.cond(
+            tf.rank(step) == 0,
+                   step = tf.expand_dims(step, axis = 0),
+                   step  = step)
+
     
     curr_thres += [list_interval[0]]
     compare += [step < curr_thres[0]]

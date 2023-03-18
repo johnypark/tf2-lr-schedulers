@@ -8,6 +8,8 @@ Copyright (c) 2023 John Park
 #### 1. Find range of LR using line search
 #### 2. model fit method to obtain validation and training losses 
 import tensorflow as tf
+import matplotlib.pyplot as plt
+import tensorflow_addons as tfa
 
 class LRSearch(tf.keras.optimizers.schedules.LearningRateSchedule):
     
@@ -60,11 +62,8 @@ class LossAndErrorPrintingCallback(tf.keras.callbacks.Callback):
         )
 
 
-
-
-
 class Search_LR():
-  import tensorflow_addons as tfa
+      
   def __init__(
       self,
       ftn_to_build_model,
@@ -103,7 +102,7 @@ class Search_LR():
     self.resize_resol = resize_resol
 
   def __call__(self, tr_ds, vali_ds, N_incre, class_weight = None, callbackclass = LossHistory()):
-    import tensorflow_addons as tfa
+    
     with self.strategy.scope():
       model = self.get_model(self.num_classes, self.resize_resol)
       model.compile(
@@ -137,7 +136,6 @@ class Search_LR():
         verbose=1)
 
     
-    import matplotlib.pyplot as plt
     LR_domain = range(0,int(self.spEpoch/N_incre)*N_incre)
     x = self.LRschedule(LR_domain)
     plt.plot(x, historylog.history2["loss"])
@@ -148,7 +146,7 @@ class Search_LR():
   ## here make a plot and get the outcomes!
 
 class Search_LR_from_compiled():
-  import tensorflow_addons as tfa
+  
   def __init__(
       self,
       compiled_model : tf.keras.Model,

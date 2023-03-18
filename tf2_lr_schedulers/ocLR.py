@@ -5,7 +5,6 @@ Copyright (c) 2021 Tananaev Denis
 
 import tensorflow as tf
 import numpy as np
-import matplotlib.pyplot as plt
 
 
 class OneCycle(tf.keras.optimizers.schedules.LearningRateSchedule):
@@ -134,31 +133,3 @@ class OneCycle(tf.keras.optimizers.schedules.LearningRateSchedule):
             "shift_peak": self.shift_peak,
             "final_lr_scale": self.final_lr_scale
         }
-
-
-if __name__ == "__main__":
-    """This is example plot of scheduler for one cycle."""
-
-    initial_learning_rate = 0.0
-    maximal_learning_rate = 1.0
-    cycle_size = 20
-    shift_peak = 0.2
-
-    scale_mode = "cycle"
-    name = "CyclicalCosine"
-    lr_schedule = OneCycle(
-        initial_learning_rate=initial_learning_rate,
-        maximal_learning_rate=maximal_learning_rate,
-        cycle_size=cycle_size,
-        scale_mode=scale_mode,
-        shift_peak=shift_peak,
-        name=name,
-    )
-    step = np.arange(0, 20)
-    lr = lr_schedule(step)
-    plt.figure(figsize=(8, 6))
-    plt.plot(step / 20, lr)
-    plt.ylim([0.0, max(plt.ylim())])
-    plt.xlabel("Epoch")
-    _ = plt.ylabel("Learning rate")
-    plt.show()

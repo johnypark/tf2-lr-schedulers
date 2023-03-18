@@ -15,6 +15,7 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     install_requires = ['tensorflow',
                         'numpy',
+                        'tensorflow-addons',
                         'typeguard'],
     classifiers=[
         "Programming Language :: Python :: 3",

@@ -59,7 +59,8 @@ class StepDecrease:
         self.scale = scale
         
     def scale_func(self, idx, scale, mask_list):
-        mask_mat = tf.cast(mask_list[idx], dtype = tf.int32)
+        mask_mat = tf.gather(mask_list, idx)
+        mask_mat = tf.cast(mask_mat, dtype = tf.int32)
         idx = tf.cast(idx*mask_mat, dtype = self.dtype)
         return scale**idx
        
@@ -160,7 +161,6 @@ class ConnectLRs:
         
         self.step_size = [lr.get_config()["step_size"] for lr in list_of_LRs]
         self.list_of_LRs = list_of_LRs
-        print(self.step_size)
         
     def __call__(self, step):
        step  = tf.convert_to_tensor(step)

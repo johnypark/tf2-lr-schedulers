@@ -110,10 +110,10 @@ def apply_funcs2intervals(step,
     mask = list()
     func_output = list()
     curr_thres = list()
-    tf.cond(
+    step = tf.cond(
             tf.rank(step) == 0,
-                   step = tf.expand_dims(step, axis = 0),
-                   step  = step)
+            lambda: tf.expand_dims(step, axis = 0),
+            lambda: step)
 
     
     curr_thres += [list_interval[0]]

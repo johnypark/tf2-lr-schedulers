@@ -2,5 +2,5 @@
  Modern LearningRateSchedulers in Tensorflow2
 
 
-![LRS_comparison](images/Different_LR_Schedulers.png)
+![LRS_comparison](images/Different_LR_schedulers.png)
 

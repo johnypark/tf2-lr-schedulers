@@ -98,6 +98,7 @@ class StepDecrease:
     def total_steps(self):
         return self.step_size
     
+
 def apply_funcs2intervals(step, 
                          list_interval,
                          list_funcs,
@@ -117,6 +118,8 @@ def apply_funcs2intervals(step,
     curr_thres += [list_interval[0]]
     compare += [step < curr_thres[0]]
     mask += [step < curr_thres[0]]
+    mask_shape = step.shape
+    mask[0].set_shape(mask_shape)
     masked_step = tf.boolean_mask(step, mask[0])
     func_output += [list_funcs[0](masked_step)]
     
@@ -124,6 +127,7 @@ def apply_funcs2intervals(step,
         curr_thres += [curr_thres[idx-1] + list_interval[idx]]
         compare += [step < curr_thres[idx]]
         curr_mask = compare[idx] ^ compare[idx - 1]
+        curr_mask.set_shape(mask_shape)
         masked_step = tf.boolean_mask(step, curr_mask)
         masked_step = masked_step - curr_thres[idx-1]
         func_output += [list_funcs[idx](masked_step)]

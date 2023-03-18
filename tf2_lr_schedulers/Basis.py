@@ -64,7 +64,7 @@ class StepDecrease:
         return scale**idx
        
     def __call__(self, step):
-        step = tf.constant(step)
+        step  = tf.convert_to_tensor(step)
         if tf.rank(step) == 0:
             step = tf.expand_dims(step, axis = 0)
         step_shape = tf.shape(step)
@@ -148,7 +148,7 @@ class ConnectLRs:
         print(self.step_size)
         
     def __call__(self, step):
-       step  = tf.constant(step)
+       step  = tf.convert_to_tensor(step)
        output = apply_funcs2intervals(step, 
                              list_interval = self.step_size,
                              list_funcs = self.list_of_LRs,

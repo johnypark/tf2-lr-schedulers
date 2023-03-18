@@ -10,19 +10,21 @@ class WarmUp:
                  max_LR,
                  step_size,
                  scale_mode = 'linear',
-                 scale_fn = None
+                 scale_fn = None,
+                 data_type = tf.float32
                  ):
         self.iLR = init_LR
         self.mLR = max_LR
         self.step_size = step_size
         self.scale_mode = scale_mode
+        self.data_type = data_type
         
     def __call__(self, step):
         x = step
         x = x/(self.step_size)
         beta = (self.mLR - self.iLR)
         fx = beta*x
-        return fx
+        return tf.cast(fx, dtype = self.data_type)
         
     def get_config(self):
         return {
@@ -55,10 +57,16 @@ class StepDecrease:
         self.change_at = change_at
         self.dtype = cls_dtype
         self.scale = scale
+        
+    def scale_func(self, idx, scale, mask_list):
+        mask_mat = tf.cast(mask_list[idx], dtype = tf.int32)
+        idx = tf.cast(idx*mask_mat, dtype = self.dtype)
+        return scale**idx
        
-    
     def __call__(self, step):
         step = tf.constant(step)
+        if tf.rank(step) == 0:
+            step = tf.expand_dims(step, axis = 0)
         step_shape = tf.shape(step)
         compare = list()
         mask = list()
@@ -73,10 +81,8 @@ class StepDecrease:
         mask_range = tf.range(len(self.change_at)+1)
         lr_segments = list(
            map(
-            lambda x: self.scale**tf.cast(
-                x*tf.cast(mask[x], dtype = tf.int32),
-                 dtype = tf.float32)
-                , mask_range )
+            lambda idx: self.scale_func(idx = idx, scale = self.scale, mask_list = mask),
+            mask_range)
             )
         output = tf.ones(shape = step_shape)
         for val_segment in lr_segments:
@@ -91,8 +97,47 @@ class StepDecrease:
     
     def total_steps(self):
         return self.step_size
-
+    
+def apply_funcs2intervals(step, 
+                         list_interval,
+                         list_funcs,
+                         data_type = tf.float32
+                         ):
+    assert (
+        len(list_interval) == len(list_funcs)
+    ), "Number of LR functions and intervals must match."
+    compare = list()
+    mask = list()
+    func_output = list()
+    curr_thres = list()
+    if tf.rank(step) == 0:
+            step = tf.expand_dims(step, axis = 0)
+    
+    curr_thres += [list_interval[0]]
+    compare += [step < curr_thres[0]]
+    mask += [step < curr_thres[0]]
+    masked_step = step[mask[0]]
+    func_output += [list_funcs[0](masked_step)]
+    
+    for idx in range(1, len(list_interval)):
+        curr_thres += [curr_thres[idx-1] + list_interval[idx]]
+        compare += [step < curr_thres[idx]]
+        curr_mask = compare[idx] ^ compare[idx - 1]
+        masked_step = step[curr_mask]
+        masked_step = masked_step - curr_thres[idx-1]
+        func_output += [list_funcs[idx](masked_step)]
+        mask += [curr_mask]
         
+    compare = [tf.cast(ele, dtype = data_type) for ele in compare]
+    final_mask = tf.math.add_n(compare) < 1
+    mask += [final_mask]
+    masked_step = step[final_mask]
+    masked_step = masked_step - curr_thres[idx-1]
+    func_output += [list_funcs[idx](masked_step)]
+    
+    return tf.concat(func_output, axis =0)
+  
+  
 class ConnectLRs:
     
     def __init__(self, 
@@ -100,35 +145,17 @@ class ConnectLRs:
         
         self.step_size = [lr.get_config()["step_size"] for lr in list_of_LRs]
         self.list_of_LRs = list_of_LRs
+        print(self.step_size)
         
     def __call__(self, step):
-        compare = list()
-        mask = list()
-        lr_out = list()
-        curr_thres = self.step_size[0]
-        compare += [step < curr_thres]
-        mask += [step < curr_thres]
-        #print(mask[0].shape)
-        #print(step.shape)
-        #print(step[mask[0]])
-        #print(self.list_of_LRs[0])
-        #print(self.list_of_LRs[0](step[mask[0]]))
-        step_use = step[mask[0]]
-        lr_out += [self.list_of_LRs[0](step_use)]
-        for idx in range(1, len(self.step_size)):
-          curr_thres += self.step_size[idx]
-          compare += [step < curr_thres]
-          mask += [compare[idx]^ compare[idx-1]]
-          step_use = step[mask[idx]]
-          step_use = step_use - self.step_size[idx-1]
-          lr_out += [self.list_of_LRs[idx](step_use)]
-        mask += [sum(compare)<1]
-        step_use = step[mask[idx+1]]
-        step_use = step_use - self.step_size[idx-1]
-        lr_out += [self.list_of_LRs[idx](step_use)]
-        return np.hstack(lr_out)
+       step  = tf.constant(step)
+       output = apply_funcs2intervals(step, 
+                             list_interval = self.step_size,
+                             list_funcs = self.list_of_LRs,
+                             data_type = tf.float32
+       )
+       return output
         
-
 def Goyal_LR(step, steps_per_epoch, init_LR =0):
     initial = WarmUp(init_LR = init_LR,
                 max_LR = 0.1,

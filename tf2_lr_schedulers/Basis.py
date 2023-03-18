@@ -86,7 +86,7 @@ class StepDecrease:
                 scale = self.scale, 
                 mask_list = mask),
             elems = mask_range,
-            dtype=tf.float32)
+            fn_output_signature=tf.float32)
         
         output = tf.math.reduce_prod(lr_segments, axis = 0)
         output *= self.mLR

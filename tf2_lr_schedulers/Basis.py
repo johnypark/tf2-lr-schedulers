@@ -64,9 +64,10 @@ class StepDecrease:
         return scale**idx
        
     def __call__(self, step):
-        step  = tf.convert_to_tensor(step)
-        if tf.rank(step) == 0:
-            step = tf.expand_dims(step, axis = 0)
+        step = tf.convert_to_tensor(step)
+        step = tf.cond( tf.rank(step) == 0,
+            lambda: tf.expand_dims(step, axis = 0),
+            lambda: step)
         step_shape = tf.shape(step)
         compare = list()
         mask = list()
@@ -118,9 +119,10 @@ def apply_funcs2intervals(step,
             lambda: step)
     
     curr_thres += [list_interval[0]]
-    compare += [step < curr_thres[0]]
-    mask += [step < curr_thres[0]]
-    where = tf.where(step < curr_thres[0])
+    condition = step < curr_thres[0]
+    compare += [condition]
+    mask += [condition]
+    where = tf.where(condition)
     masked_step = tf.gather(step, where)
     func_output += [list_funcs[0](masked_step)]
     

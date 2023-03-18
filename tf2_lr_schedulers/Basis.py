@@ -1,5 +1,6 @@
 #!python
 import numpy as np
+import tensorflow as tf
 
 
 class WarmUp:
@@ -30,16 +31,15 @@ class WarmUp:
         
     def total_steps(self):
         return self.step_size
-        
-        
-        
+            
 class StepDecrease:
     
     def __init__(self,
                  max_LR,
                  step_size,
-                 change_at,
-                 scale = 0.1
+                 change_at, 
+                 scale = 0.1,
+                 cls_dtype = tf.float32
                  ):
     
         self.mLR = max_LR
@@ -53,10 +53,14 @@ class StepDecrease:
                         point_value, 
                         step_size)
         self.change_at = change_at
+        self.dtype = cls_dtype
         self.scale = scale
+       
         
         
     def __call__(self, step):
+        step = tf.constant(step)
+        step_shape = tf.shape(step)
         compare = list()
         mask = list()
         compare += [step < self.change_at[0]]
@@ -65,12 +69,22 @@ class StepDecrease:
         for idx in range(1, len(self.change_at)):
             compare += [step < self.change_at[idx]]
             mask += [compare[idx]^compare[idx-1]]
-        mask += [sum(compare)<1]
-        mask_range = range(len(self.change_at)+1)
-        sum_up = list(
-            map(lambda x: self.scale**(x+1)*mask[x], mask_range )
+        compare = [tf.cast(ten, dtype = self.dtype) for ten in compare]
+        mask += [tf.math.add_n(compare)<1]
+        mask_range = tf.range(len(self.change_at)+1)
+        lr_segments = list(
+           map(
+            lambda x: self.scale**tf.cast(
+                x*tf.cast(mask[x], dtype = tf.int32),
+                 dtype = tf.float32)
+                , mask_range )
             )
-        return sum(sum_up)
+        output = tf.ones(shape = step_shape)
+        for val_segment in lr_segments:
+          output *= val_segment
+        output *= self.mLR
+        return output
+        #return tf.math.add_n(sum_up)
     
     def get_config(self):
         return {

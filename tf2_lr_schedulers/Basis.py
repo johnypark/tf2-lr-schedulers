@@ -110,23 +110,21 @@ def apply_funcs2intervals(step,
     mask = list()
     func_output = list()
     curr_thres = list()
-    step = tf.cond(
-            tf.rank(step) == 0,
-            lambda: tf.expand_dims(step, axis = 0),
-            lambda: step)
-
+    if tf.rank(step) == 0:
+            step = tf.expand_dims(step, axis = 0)
+    step_shape = tf.shape(step)
     
     curr_thres += [list_interval[0]]
     compare += [step < curr_thres[0]]
     mask += [step < curr_thres[0]]
-    masked_step = step[mask[0]]
+    masked_step = tf.boolean_mask(step, mask[0])
     func_output += [list_funcs[0](masked_step)]
     
     for idx in range(1, len(list_interval)):
         curr_thres += [curr_thres[idx-1] + list_interval[idx]]
         compare += [step < curr_thres[idx]]
         curr_mask = compare[idx] ^ compare[idx - 1]
-        masked_step = step[curr_mask]
+        masked_step = tf.boolean_mask(step, curr_mask)
         masked_step = masked_step - curr_thres[idx-1]
         func_output += [list_funcs[idx](masked_step)]
         mask += [curr_mask]
@@ -134,10 +132,9 @@ def apply_funcs2intervals(step,
     compare = [tf.cast(ele, dtype = data_type) for ele in compare]
     final_mask = tf.math.add_n(compare) < 1
     mask += [final_mask]
-    masked_step = step[final_mask]
+    masked_step = tf.boolean_mask(step, final_mask)
     masked_step = masked_step - curr_thres[idx-1]
     func_output += [list_funcs[idx](masked_step)]
-    
     return tf.concat(func_output, axis =0)
   
   
@@ -159,16 +156,25 @@ class ConnectLRs:
        )
        return output
         
-def Goyal_LR(step, steps_per_epoch, init_LR =0):
-    initial = WarmUp(init_LR = init_LR,
+class Goyal_LR(tf.keras.optimizers.schedules.LearningRateSchedule):
+    def __init__(self, 
+                 steps_per_epoch, 
+                 init_LR =0,
+                 name = 'Goyal'):
+        super(Goyal_LR, self).__init__()
+    
+        self.initial = WarmUp(init_LR = init_LR,
                 max_LR = 0.1,
                 step_size = 5*steps_per_epoch)
-    subseq = StepDecrease(max_LR = 0.1, 
+        self.subseq = StepDecrease(max_LR = 0.1, 
                         step_size = 100*steps_per_epoch,
                         change_at = [30, 60, 90]*steps_per_epoch)
-    lr_scheduler = ConnectLRs([initial, subseq])
-    return lr_scheduler(step)
+        self.lr_scheduler = ConnectLRs([self.initial, self.subseq])
+        self.name = name
 
+    def __call__(self, step, optimizer = False):
+      with tf.name_scope(self.name):
+        return self.lr_scheduler(step)
 
     
     

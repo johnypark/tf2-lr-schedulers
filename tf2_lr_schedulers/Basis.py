@@ -283,6 +283,8 @@ class StepWiseLR(tf.keras.optimizers.schedules.LearningRateSchedule):
         shift_points=[0.3, 0.3, 0.3],
         scale_mode="cycle",
         final_lr_scale=1.0,
+        warm_up = None,
+        cool_down = None,
         name=None,
     ):
         super().__init__()
@@ -332,11 +334,18 @@ class StepWiseLR(tf.keras.optimizers.schedules.LearningRateSchedule):
                 accum_shift_points += [accum_shift_points[idx-1] + self.shift_points[idx]]
                 compare += [percentage_complete <= accum_shift_points[idx]]
                 masks += [tf.cast(compare[idx-1] ^ compare[idx], dtype)]
-                print("Normalized steps {}".format(normalized_steps))
-                print("Shift_steps {}".format(shift_steps[idx-1]))
+                #print("Normalized steps {}".format(normalized_steps))
+                #print("Shift_steps {}".format(shift_steps[idx-1]))
                 normalized_steps += [normalized_steps[idx-1] - tf.squeeze(shift_steps[idx-1])]
+            
+            compare = [tf.cast(ele, dtype = dtype) for ele in compare]
+            final_mask = tf.cast(tf.math.add_n(compare) < 1, dtype)
+            mask += [final_mask]
+            normalized_steps += [normalized_steps[idx-1] - tf.squeeze(shift_steps[idx-1])]
+            final_step = self._total_steps - sum(self._shift_steps)
+            
 
-            print("len Normalized steps: {}".format(len(normalized_steps)))
+            #print("len Normalized steps: {}".format(len(normalized_steps)))
             lr_0= self.get_constant(
                 initial_learning_rate,
                 normalized_steps[0],
@@ -355,8 +364,15 @@ class StepWiseLR(tf.keras.optimizers.schedules.LearningRateSchedule):
                 shift_steps[2],
                 cycle
             )
+            
+            lr_3 = self.get_constant(
+                initial_learning_rate * self.alpha_factor**3,
+                normalized_steps[3],
+                final_step,
+                cycle
+            )
 
-            lr_res = masks[0]*lr_0 + masks[1]*lr_1 + masks[2]*lr_2 
+            lr_res = masks[0]*lr_0 + masks[1]*lr_1 + masks[2]*lr_2 + masks[3]*lr_3
           
             mode_step = cycle if self.scale_mode == "cycle" else step
 

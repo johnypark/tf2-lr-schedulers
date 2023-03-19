@@ -334,8 +334,6 @@ class StepWiseLR(tf.keras.optimizers.schedules.LearningRateSchedule):
                 accum_shift_points += [accum_shift_points[idx-1] + self.shift_points[idx]]
                 compare += [percentage_complete <= accum_shift_points[idx]]
                 masks += [tf.cast(compare[idx-1] ^ compare[idx], dtype)]
-                #print("Normalized steps {}".format(normalized_steps))
-                #print("Shift_steps {}".format(shift_steps[idx-1]))
                 normalized_steps += [normalized_steps[idx-1] - tf.squeeze(shift_steps[idx-1])]
             
             compare = [tf.cast(ele, dtype = dtype) for ele in compare]
@@ -345,7 +343,6 @@ class StepWiseLR(tf.keras.optimizers.schedules.LearningRateSchedule):
             final_step = self._total_steps - sum(self._shift_steps)
             
 
-            #print("len Normalized steps: {}".format(len(normalized_steps)))
             lr_0= self.get_constant(
                 initial_learning_rate,
                 normalized_steps[0],

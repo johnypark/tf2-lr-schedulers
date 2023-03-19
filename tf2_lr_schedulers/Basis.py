@@ -180,11 +180,11 @@ def Cyclical_LR(cycle_size,
 
 
 class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
-
+    
     def __init__(
         self,
         cycle_size,
-        interval_fractions = [0.5, 0.5], 
+        interval_fractions = [0.3, 0.7], 
         initial_learning_rate = 1e-6,
         maximum_learning_rate = 1e-2,
         scale_mode="cycle",
@@ -211,6 +211,12 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
         beta = (end - start)
         linear = beta * x + start
         return linear
+    
+    def xor_matrix(num_edge):
+        diag_ones = tf.ones(num_edge)
+        diag_neg_ones = tf.ones(num_edge-1)*(-1)
+        return tf.linalg.diag(diag_ones, k = 0) + tf.linalg.diag(diag_neg_ones, k = -1)
+
 
     def __call__(self, step, optimizer=False):
         with tf.name_scope(self.name or "CyclicLR"):
@@ -222,29 +228,66 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
             lambda: tf.expand_dims(step, axis = 0),
             lambda: step)
             total_steps = tf.cast(self._total_steps, dtype)
-            interval_steps = [tf.cast(ele, dtype) for ele in self._interval_steps] 
             cycle_progress = step / total_steps
             cycle = tf.floor(1 + cycle_progress)
+            normalized_steps = step - (cycle -1)*total_steps
             percentage_complete = 1.0 - tf.abs(cycle - cycle_progress)
-            compare = percentage_complete <= self.interval_fractions[0]
-            mask0 = tf.cast(compare, dtype)
-            interval_cumul = self.interval_fractions[0]
-            normalized_steps = [step - (cycle -1)*total_steps]
-            interval_cumul  = self.interval_fractions[0] + self.interval_fractions[1]
-            mask1 = tf.cast(compare ^ (percentage_complete <= interval_cumul), dtype)
-            normalized_steps += [normalized_steps[0] - tf.squeeze(interval_steps[0])]
+            
+            utm_ones = tf.linalg.band_part(tf.ones(
+                                        (len(self.interval_fractions),
+                                        len(self.interval_fractions))
+                                      ), 0, -1)
+            
+            interval_cumul = tf.expand_dims(
+                                  tf.cast(
+                                      self.interval_fractions, 
+                                      dtype = utm_ones.dtype),
+                                      axis = 0)@utm_ones
+
+            interval_cumul = tf.squeeze(interval_cumul)
+            interval_cumul = tf.cond(tf.reduce_max(interval_cumul) < 1.0,
+                              lambda: tf.concat([interval_cumul, tf.reshape(tf.constant(1.0),(1,))], axis = -1),
+                              lambda: interval_cumul
+                              )
+            
+            compare = tf.map_fn(lambda thres: percentage_complete < thres, tf.cast(interval_cumul, dtype),
+                    fn_output_signature=tf.bool)
+            
+
+            num_edge = tf.shape(compare)[0]
+            diag_ones = tf.ones(num_edge)
+            diag_neg_ones = tf.ones(num_edge-1)*(-1)
+            tsm = tf.linalg.diag(diag_ones, k = 0) + tf.linalg.diag(diag_neg_ones, k = -1)
+            mask = tsm@tf.cast(compare, tsm.dtype) 
+            
+            _interval_steps = tf.cast(self._interval_steps, 
+                                      dtype = utm_ones.dtype)
+
+            interval_steps_cumul = tf.expand_dims( _interval_steps,
+                                      axis = 0)@utm_ones
+            interval_steps_cumul = tf.squeeze(interval_steps_cumul) 
+            interval_steps_cumul = tf.concat([tf.reshape(tf.constant(0.0),(1,)), interval_steps_cumul], axis = -1)     
+            
+            tensor_normalized_steps = tf.map_fn(
+                lambda idx: (
+                    normalized_steps - tf.gather(interval_steps_cumul, idx)
+                    )/tf.gather(_interval_steps, idx)
+                , tf.range(_interval_steps.shape[0]),
+                fn_output_signature = dtype
+            )
                 
             lr_seg1 = self.linear_func(
-                    step = normalized_steps[0]/ interval_steps[0],
+                    step = tf.gather(tensor_normalized_steps,0),
                     start = initial_learning_rate,
                     end = maximum_learning_rate
                     ) 
             lr_seg2 = self.linear_func(
-                    step = normalized_steps[1]/ interval_steps[1],
+                    step = tf.gather(tensor_normalized_steps,1),
                     start = maximum_learning_rate, 
                     end = initial_learning_rate,
                     ) 
-            lr_res = mask0*lr_seg1 + mask1*lr_seg2
+            
+            lr_res = tf.gather(mask,0)*lr_seg1 + tf.gather(mask,1)*lr_seg2
             
             mode_step = cycle if self.scale_mode == "cycle" else step
 
@@ -259,4 +302,5 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
             "cycle_size": self.cycle_size,
             "scale_mode": self.scale_mode
         }
+    
     

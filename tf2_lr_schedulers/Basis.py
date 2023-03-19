@@ -2,18 +2,20 @@
 import numpy as np
 import tensorflow as tf
 from functools import partial
-
+@tf.function(jit_compile=True)
 def constant_func(learning_rate, step):
     step_shape = tf.shape(step)
     print(step_shape)
     output = tf.ones(step_shape)*learning_rate
     return output
 
+@tf.function(jit_compile=True)
 def cosine_annealing_func(step, start, end):
     x = step 
     cosine_annealing = 1 + tf.math.cos(tf.constant(np.pi) * x)
     return end + 0.5 * (start - end) * cosine_annealing
 
+@tf.function(jit_compile=True)
 def linear_func(step, start, end):
     x = step
     beta = (end - start)
@@ -205,14 +207,8 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
         self._total_steps = cycle_size
         self._interval_steps = [ele*self._total_steps for ele in self.interval_fractions]
         
-    
-    def linear_func(self, step, start, end):
-        x = step
-        beta = (end - start)
-        linear = beta * x + start
-        return linear
-    
-    def xor_matrix(num_edge):
+
+    def xor_matrix(self, num_edge):
         diag_ones = tf.ones(num_edge)
         diag_neg_ones = tf.ones(num_edge-1)*(-1)
         return tf.linalg.diag(diag_ones, k = 0) + tf.linalg.diag(diag_neg_ones, k = -1)
@@ -249,15 +245,9 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
                               lambda: tf.concat([interval_cumul, tf.reshape(tf.constant(1.0),(1,))], axis = -1),
                               lambda: interval_cumul
                               )
-            
             compare = tf.map_fn(lambda thres: percentage_complete < thres, tf.cast(interval_cumul, dtype),
                     fn_output_signature=tf.bool)
-            
-
-            num_edge = tf.shape(compare)[0]
-            diag_ones = tf.ones(num_edge)
-            diag_neg_ones = tf.ones(num_edge-1)*(-1)
-            tsm = tf.linalg.diag(diag_ones, k = 0) + tf.linalg.diag(diag_neg_ones, k = -1)
+            tsm = self.xor_matrix(num_edge = tf.shape(compare)[0])
             mask = tsm@tf.cast(compare, tsm.dtype) 
             
             _interval_steps = tf.cast(self._interval_steps, 
@@ -276,12 +266,12 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
                 fn_output_signature = dtype
             )
                 
-            lr_seg1 = self.linear_func(
+            lr_seg1 = linear_func(
                     step = tf.gather(tensor_normalized_steps,0),
                     start = initial_learning_rate,
                     end = maximum_learning_rate
                     ) 
-            lr_seg2 = self.linear_func(
+            lr_seg2 = linear_func(
                     step = tf.gather(tensor_normalized_steps,1),
                     start = maximum_learning_rate, 
                     end = initial_learning_rate,

@@ -4,7 +4,9 @@ import tensorflow as tf
 from functools import partial
 
 def constant_func(learning_rate, step):
-    output = tf.ones(step.shape)*learning_rate
+    step_shape = tf.shape(step)
+    print(step_shape)
+    output = tf.ones(step_shape)*learning_rate
     return output
 
 def cosine_annealing_func(step, start, end):

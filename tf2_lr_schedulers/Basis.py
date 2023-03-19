@@ -148,19 +148,21 @@ def apply_funcs2intervals(step,
 class ConnectLRs:
     
     def __init__(self, 
-                 list_of_LRs):
+                 list_of_LRs,
+                 max_LR):
         
         self.step_size = [lr.get_config()["step_size"] for lr in list_of_LRs]
         self.list_of_LRs = list_of_LRs
+        self.max_LR = max_LR
         
     def __call__(self, step):
-       step  = tf.convert_to_tensor(step)
-       output = apply_funcs2intervals(step, 
+        max_LR = tf.convert_to_tensor(self.max_LR)
+        output = apply_funcs2intervals(step, 
                              list_interval = self.step_size,
                              list_funcs = self.list_of_LRs,
-                             data_type = step.dtype
-       )
-       return output
+                             data_type = max_LR.dtype
+        )
+        return output
    
    
 class ConstantLR:
@@ -187,9 +189,11 @@ class ConstantLR:
 class Goyal_LR(tf.keras.optimizers.schedules.LearningRateSchedule):
     def __init__(self, 
                  steps_per_epoch, 
-                 init_LR =0,
+                 init_LR =0.0,
                  name = 'Goyal'):
         super(Goyal_LR, self).__init__()
+        
+        max_LR = 0.1
     
         self.initial = WarmUp(init_LR = init_LR,
                 max_LR = 0.1,
@@ -213,7 +217,8 @@ class Goyal_LR(tf.keras.optimizers.schedules.LearningRateSchedule):
                                         self.constant1,
                                         self.constant2,
                                         self.constant3,
-                                        self.constant4])
+                                        self.constant4],
+                                        max_LR = max_LR)
         self.name = name
 
     def __call__(self, step, optimizer = False):
@@ -226,7 +231,7 @@ class Goyal_style_LR(tf.keras.optimizers.schedules.LearningRateSchedule):
                  rate_decrease,
                  steps_per_epoch, 
                  intervals = [5, 30, 30, 30, 10], 
-                 init_LR = 0,
+                 init_LR = 0.0,
                  
                  
                  name = 'Goyal_style'):
@@ -254,7 +259,8 @@ class Goyal_style_LR(tf.keras.optimizers.schedules.LearningRateSchedule):
                                         self.constant1,
                                         self.constant2,
                                         self.constant3,
-                                        self.constant4])
+                                        self.constant4],
+                                       max_LR = max_LR)
         self.name = name
 
     def __call__(self, step, optimizer = False):

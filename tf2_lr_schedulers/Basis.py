@@ -215,8 +215,8 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
     def __call__(self, step, optimizer=False):
         with tf.name_scope(self.name or "CyclicLR"):
             initial_learning_rate = tf.convert_to_tensor(self.initial_learning_rate, name="initial_learning_rate")
-            maximum_learning_rate = tf.cast(self.maximum_learning_rate, dtype)
             dtype = initial_learning_rate.dtype
+            maximum_learning_rate = tf.cast(self.maximum_learning_rate, dtype)
             step = tf.cast(step, dtype)
             step = tf.cond( tf.rank(step) == 0,
             lambda: tf.expand_dims(step, axis = 0),

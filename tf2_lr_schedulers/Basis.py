@@ -179,9 +179,7 @@ class ConstantLR:
         return constant
     
     def get_config(self):
-        return {
-        "learning_rate": self.learning_rate,
-        "step_size": self.step_size}
+        return {"step_size": self.step_size}
                
 class Goyal_LR(tf.keras.optimizers.schedules.LearningRateSchedule):
     def __init__(self, 
@@ -193,6 +191,7 @@ class Goyal_LR(tf.keras.optimizers.schedules.LearningRateSchedule):
         self.initial = WarmUp(init_LR = init_LR,
                 max_LR = 0.1,
                 step_size = 5*steps_per_epoch)
+        
         self.constant1 = ConstantLR(learning_rate = 0.1,
                                     step_size = 30*steps_per_epoch)
         

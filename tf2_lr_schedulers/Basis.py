@@ -149,9 +149,13 @@ class ConnectLRs:
     
     def __init__(self, 
                  list_of_LRs,
-                 max_LR):
+                 max_LR,
+                 list_of_intervals = None):
         
-        self.step_size = [lr.get_config()["step_size"] for lr in list_of_LRs]
+        if list_of_intervals:
+            self.step_size = list_of_intervals
+        else:
+            self.step_size = [lr.get_config()["step_size"] for lr in list_of_LRs]
         self.list_of_LRs = list_of_LRs
         self.max_LR = max_LR
         
@@ -176,7 +180,7 @@ class ConstantLR:
 
     def __call__(self, step):
         LR = tf.convert_to_tensor(self.learning_rate)
-        #step = tf.cast(step, LR.dtype)
+        step = tf.cast(step, tf.int32)
         step_shape = tf.shape(step)
         constant = tf.ones(shape = step_shape)*LR
         return constant

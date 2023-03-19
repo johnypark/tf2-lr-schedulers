@@ -246,12 +246,8 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
                     start = maximum_learning_rate, 
                     end = initial_learning_rate,
                     ) 
-            lr_segments = [lr_seg1] + [lr_seg2] 
-            masks = tf.stack(masks, axis = 0)
-            lr_segments = tf.stack(lr_segments, axis = 0)
-            lr_res = masks*lr_segments
-            lr_res = tf.math.reduce_sum(lr_res, axis = 0)
-      
+            lr_res = masks[0]*lr_seg1 + masks[1]*lr_seg2
+            
             mode_step = cycle if self.scale_mode == "cycle" else step
 
             if optimizer == False:

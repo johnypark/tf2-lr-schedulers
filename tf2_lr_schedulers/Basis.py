@@ -19,7 +19,7 @@ class WarmUp:
         self.scale_mode = scale_mode
         
     def __call__(self, step):
-        x = step
+        x = tf.cast(step, self.data_type)
         x = x/(self.step_size)
         beta = (self.mLR - self.iLR)
         fx = beta*x

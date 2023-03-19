@@ -85,7 +85,7 @@ class StepDecrease:
                 scale = self.scale, 
                 mask_list = mask),
             elems = mask_range,
-            fn_output_signature=tf.float32)
+            fn_output_signature= self.dtype)
         
         output = tf.math.reduce_prod(lr_segments, axis = 0)
         output *= self.mLR
@@ -229,8 +229,8 @@ class Goyal_style_LR(tf.keras.optimizers.schedules.LearningRateSchedule):
                  init_LR = 0,
                  
                  
-                 name = 'Goyal'):
-        super(Goyal_LR, self).__init__()
+                 name = 'Goyal_style'):
+        super(Goyal_style_LR, self).__init__()
     
         self.initial = WarmUp(init_LR = init_LR,
                 max_LR = max_LR,

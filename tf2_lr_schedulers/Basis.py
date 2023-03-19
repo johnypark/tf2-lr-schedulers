@@ -64,7 +64,7 @@ class ComposeLR(tf.keras.optimizers.schedules.LearningRateSchedule):
             lambda: tf.expand_dims(step, axis = 0),
             lambda: step)
             total_steps = tf.cast(self._total_steps, dtype)
-            shift_steps = [tf.cast(ele, dtype) for ele in self._interval_steps] 
+            interval_steps = [tf.cast(ele, dtype) for ele in self._interval_steps] 
             cycle_progress = step / total_steps
             cycle = tf.floor(1 + cycle_progress)
             percentage_complete = 1.0 - tf.abs(cycle - cycle_progress)
@@ -72,21 +72,20 @@ class ComposeLR(tf.keras.optimizers.schedules.LearningRateSchedule):
             interval_cumul = [self.interval_fractions[0]]
             normalized_steps = [step - (cycle -1)*total_steps]
             masks = [tf.cast(compare[0], dtype)]
+            lr_segments = [self.list_funcs[0](
+                step = normalized_steps[0]/ interval_steps[0]
+            )]
 
             for idx in range(1, len(self.interval_fractions)):
                 interval_cumul += [interval_cumul[idx-1] + self.interval_fractions[idx]]
                 compare += [percentage_complete <= interval_cumul[idx]]
                 masks += [tf.cast(compare[idx-1] ^ compare[idx], dtype)]
-                normalized_steps += [normalized_steps[idx-1] - tf.squeeze(shift_steps[idx-1])]
-            
-            masks = tf.stack(masks, axis = 0)
-            
-            lr_segments = list()
-            
-            for idx in range(len(self._interval_steps)):
+                normalized_steps += [normalized_steps[idx-1] - tf.squeeze(interval_steps[idx-1])]
                 lr_segments += [self.list_funcs[idx](
-                    step = normalized_steps[idx]/ shift_steps[idx]
+                    step = normalized_steps[idx]/ interval_steps[idx]
                 )]
+                
+            masks = tf.stack(masks, axis = 0)
             lr_segments = tf.stack(lr_segments, axis = 0)
             lr_res = masks*lr_segments
             lr_res = tf.math.reduce_sum(lr_res, axis = 0)

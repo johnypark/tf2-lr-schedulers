@@ -226,15 +226,13 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
             cycle_progress = step / total_steps
             cycle = tf.floor(1 + cycle_progress)
             percentage_complete = 1.0 - tf.abs(cycle - cycle_progress)
-            compare = [percentage_complete <= self.interval_fractions[0]]
-            interval_cumul = [self.interval_fractions[0]]
+            compare = percentage_complete <= self.interval_fractions[0]
+            mask0 = tf.cast(compare, dtype)
+            interval_cumul = self.interval_fractions[0]
             normalized_steps = [step - (cycle -1)*total_steps]
-            masks = [tf.cast(compare[0], dtype)]
-            for idx in range(1, len(self.interval_fractions)):
-                interval_cumul += [interval_cumul[idx-1] + self.interval_fractions[idx]]
-                compare += [percentage_complete <= interval_cumul[idx]]
-                masks += [tf.cast(compare[idx-1] ^ compare[idx], dtype)]
-                normalized_steps += [normalized_steps[idx-1] - tf.squeeze(interval_steps[idx-1])]
+            interval_cumul  = self.interval_fractions[0] + self.interval_fractions[1]
+            mask1 = tf.cast(compare ^ (percentage_complete <= interval_cumul), dtype)
+            normalized_steps += [normalized_steps[0] - tf.squeeze(interval_steps[0])]
                 
             lr_seg1 = self.linear_func(
                     step = normalized_steps[0]/ interval_steps[0],
@@ -246,7 +244,7 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
                     start = maximum_learning_rate, 
                     end = initial_learning_rate,
                     ) 
-            lr_res = masks[0]*lr_seg1 + masks[1]*lr_seg2
+            lr_res = mask0*lr_seg1 + mask1*lr_seg2
             
             mode_step = cycle if self.scale_mode == "cycle" else step
 

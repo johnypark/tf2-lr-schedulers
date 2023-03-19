@@ -178,4 +178,91 @@ def Cyclical_LR(cycle_size,
         name= 'Triangluar_Cyclical_LR',
     )
 
+
+class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
+
+    def __init__(
+        self,
+        cycle_size,
+        interval_fractions = [0.5, 0.5], 
+        initial_learning_rate = 1e-6,
+        maximum_learning_rate = 1e-2,
+        scale_mode="cycle",
+        final_lr_scale=1.0,
+        scale_fn=lambda x: 1.0,
+        name="CylicLR",
+    ):  
+        
+        super().__init__()
+        self.initial_learning_rate = initial_learning_rate
+        self.maximum_learning_rate = maximum_learning_rate
+        self.cycle_size = cycle_size
+        self.scale_fn = scale_fn
+        self.scale_mode = scale_mode
+        self.interval_fractions = interval_fractions
+        self.final_lr_scale = final_lr_scale
+        self.name = name
+        self._total_steps = cycle_size
+        self._interval_steps = [ele*self._total_steps for ele in self.interval_fractions]
+        
+    
+    def linear_func(self, step, start, end):
+        x = step
+        beta = (end - start)
+        linear = beta * x + start
+        return linear
+
+    def __call__(self, step, optimizer=False):
+        with tf.name_scope(self.name or "CyclicLR"):
+            initial_learning_rate = tf.convert_to_tensor(self.initial_learning_rate, name="initial_learning_rate")
+            maximum_learning_rate = tf.cast(self.maximum_learning_rate, dtype)
+            dtype = initial_learning_rate.dtype
+            step = tf.cast(step, dtype)
+            step = tf.cond( tf.rank(step) == 0,
+            lambda: tf.expand_dims(step, axis = 0),
+            lambda: step)
+            total_steps = tf.cast(self._total_steps, dtype)
+            interval_steps = [tf.cast(ele, dtype) for ele in self._interval_steps] 
+            cycle_progress = step / total_steps
+            cycle = tf.floor(1 + cycle_progress)
+            percentage_complete = 1.0 - tf.abs(cycle - cycle_progress)
+            compare = [percentage_complete <= self.interval_fractions[0]]
+            interval_cumul = [self.interval_fractions[0]]
+            normalized_steps = [step - (cycle -1)*total_steps]
+            masks = [tf.cast(compare[0], dtype)]
+            for idx in range(1, len(self.interval_fractions)):
+                interval_cumul += [interval_cumul[idx-1] + self.interval_fractions[idx]]
+                compare += [percentage_complete <= interval_cumul[idx]]
+                masks += [tf.cast(compare[idx-1] ^ compare[idx], dtype)]
+                normalized_steps += [normalized_steps[idx-1] - tf.squeeze(interval_steps[idx-1])]
+                
+            lr_seg1 = self.linear_func(
+                    step = normalized_steps[0]/ interval_steps[0],
+                    start = initial_learning_rate,
+                    end = maximum_learning_rate
+                    ) 
+            lr_seg2 = self.linear_func(
+                    step = normalized_steps[1]/ interval_steps[1],
+                    start = maximum_learning_rate, 
+                    end = initial_learning_rate,
+                    ) 
+            lr_segments = [lr_seg1] + [lr_seg2] 
+            masks = tf.stack(masks, axis = 0)
+            lr_segments = tf.stack(lr_segments, axis = 0)
+            lr_res = masks*lr_segments
+            lr_res = tf.math.reduce_sum(lr_res, axis = 0)
+      
+            mode_step = cycle if self.scale_mode == "cycle" else step
+
+            if optimizer == False:
+                lr_res = lr_res * self.scale_fn(mode_step)
+
+            return lr_res
+
+    def get_config(self):
+        return {
+            "initial_learning_rate": self.initial_learning_rate,
+            "cycle_size": self.cycle_size,
+            "scale_mode": self.scale_mode
+        }
     

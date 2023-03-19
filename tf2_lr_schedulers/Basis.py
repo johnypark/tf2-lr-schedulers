@@ -174,8 +174,10 @@ class ConstantLR:
         self.step_size = step_size
 
     def __call__(self, step):
-        step_shape = step.shape
-        constant = tf.ones(shape = step_shape)*self.learning_rate
+        LR = tf.convert_to_tensor(self.learning_rate)
+        step = tf.cast(step, LR.dtype)
+        step_shape = tf.shape(step)
+        constant = tf.ones(shape = step_shape)*LR
         return constant
     
     def get_config(self):

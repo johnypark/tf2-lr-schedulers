@@ -79,14 +79,15 @@ class ComposeLR(tf.keras.optimizers.schedules.LearningRateSchedule):
                 masks += [tf.cast(compare[idx-1] ^ compare[idx], dtype)]
                 normalized_steps += [normalized_steps[idx-1] - tf.squeeze(shift_steps[idx-1])]
             
-            masks = tf.stack(masks, axis = 0)         
-            lr_segments = tf.map_fn(
-                lambda x: self.list_funcs[x](
-                    step = normalized_steps[x]/ shift_steps[x]
-                ), range(len(self._interval_steps)),
-                fn_output_signature = dtype
-            )
+            masks = tf.stack(masks, axis = 0)
             
+            lr_segments = list()
+            
+            for idx in range(len(self._interval_steps)):
+                lr_segments += [self.list_funcs[idx](
+                    step = normalized_steps[idx]/ shift_steps[idx]
+                )]
+            lr_segments = tf.stack(lr_segments, axis = 0)
             lr_res = masks*lr_segments
             lr_res = tf.math.reduce_sum(lr_res, axis = 0)
       

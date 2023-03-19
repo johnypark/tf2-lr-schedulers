@@ -270,6 +270,109 @@ class Goyal_style_LR(tf.keras.optimizers.schedules.LearningRateSchedule):
     def __call__(self, step, optimizer = False):
       with tf.name_scope(self.name):
         return self.lr_scheduler(step)
+    
+
+class StepWiseLR(tf.keras.optimizers.schedules.LearningRateSchedule):
+
+    def __init__(
+        self,
+        cycle_size,
+        initial_learning_rate = 0.1,
+        alpha_factor = 0.2,
+        scale_fn=lambda x: 1.0,
+        shift_points=[0.3, 0.3, 0.3],
+        scale_mode="cycle",
+        final_lr_scale=1.0,
+        name=None,
+    ):
+        super().__init__()
+        self.initial_learning_rate = initial_learning_rate
+        self.alpha_factor = alpha_factor
+        self.cycle_size = cycle_size
+        self.scale_fn = scale_fn
+        self.scale_mode = scale_mode
+        self.shift_points = shift_points
+        self.final_lr_scale = final_lr_scale
+        self.name = name
+        # Defines the position of the max lr in steps
+        self._total_steps = cycle_size
+        self._shift_steps = [ele*self._total_steps for ele in self.shift_points]
+
+    #def get_cosine_annealing(self, start, end, step, step_size_part, cycle):
+    #    x = step / step_size_part
+    #    cosine_annealing = 1 + tf.math.cos(tf.constant(np.pi) * x)
+    #    return end + 0.5 * (start - end) * cosine_annealing
+
+    def get_constant(self, learning_rate, step, step_size_part, cycle):
+        x = step / step_size_part
+        x.shape
+        output = tf.ones(x.shape)*learning_rate
+        return output
+
+    def __call__(self, step, optimizer=False):
+        with tf.name_scope(self.name or "OneCycle"):
+            initial_learning_rate = tf.convert_to_tensor(self.initial_learning_rate, name="initial_learning_rate")
+            dtype = initial_learning_rate.dtype
+            step = tf.cast(step, dtype)
+            total_steps = tf.cast(self._total_steps, dtype)
+            print(self._shift_steps)
+            shift_steps = [tf.cast(ele, dtype) for ele in self._shift_steps] 
+            # Check in % the cycle
+            cycle_progress = step / total_steps
+            cycle = tf.floor(1 + cycle_progress)
+
+            percentage_complete = 1.0 - tf.abs(cycle - cycle_progress)  # percent of iterations done
+            
+            compare = [percentage_complete <= self.shift_points[0]]
+            accum_shift_points = [self.shift_points[0]]
+            normalized_steps = [step - (cycle -1)*total_steps]
+            masks = [tf.cast(compare, dtype)]
+
+            for idx in range(1, len(self.shift_points)):
+                accum_shift_points += [accum_shift_points[idx-1] + self.shift_points[idx]]
+                compare += [percentage_complete <= accum_shift_points[idx]]
+                masks += [tf.cast(compare[idx-1] ^ compare[idx], dtype)]
+                print("Normalized steps {}".format(normalized_steps))
+                print("Shift_steps {}".format(shift_steps[idx-1]))
+                normalized_steps += [normalized_steps[idx-1] - tf.squeeze(shift_steps[idx-1])]
+
+            print("len Normalized steps: {}".format(len(normalized_steps)))
+            lr_0= self.get_constant(
+                initial_learning_rate,
+                normalized_steps[0],
+                shift_steps[0],
+                cycle
+            )
+            lr_1 = self.get_constant(
+                initial_learning_rate * self.alpha_factor,
+                normalized_steps[1],
+                shift_steps[1],
+                cycle
+            )
+            lr_2 = self.get_constant(
+                initial_learning_rate * self.alpha_factor**2,
+                normalized_steps[2],
+                shift_steps[2],
+                cycle
+            )
+
+            lr_res = masks[0]*lr_0 + masks[1]*lr_1 + masks[2]*lr_2 
+          
+            mode_step = cycle if self.scale_mode == "cycle" else step
+
+            if optimizer == False:
+                lr_res = lr_res * self.scale_fn(mode_step)
+
+            return tf.squeeze(lr_res)
+
+    def get_config(self):
+        return {
+            "initial_learning_rate": self.initial_learning_rate,
+            "cycle_size": self.cycle_size,
+            "scale_mode": self.scale_mode,
+            "shift_peak": self.shift_peak,
+            "final_lr_scale": self.final_lr_scale
+        }
 
 
     

@@ -220,9 +220,9 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
             dtype = initial_learning_rate.dtype
             maximum_learning_rate = tf.cast(self.maximum_learning_rate, dtype)
             step = tf.cast(step, dtype)
-            step = tf.cond( tf.rank(step) == 0,
-            lambda: tf.expand_dims(step, axis = 0),
-            lambda: step)
+            #step = tf.cond( tf.rank(step) == 0,
+            #lambda: tf.expand_dims(step, axis = 0),
+            #lambda: step)
             total_steps = tf.cast(self._total_steps, dtype)
             cycle_progress = step / total_steps
             cycle = tf.floor(1 + cycle_progress)
@@ -271,11 +271,15 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
                     start = initial_learning_rate,
                     end = maximum_learning_rate
                     ) 
+            
+            print(tf.shape(lr_seg1))
             lr_seg2 = linear_func(
                     step = tf.gather(tensor_normalized_steps,1),
                     start = maximum_learning_rate, 
                     end = initial_learning_rate,
                     ) 
+            
+            print(tf.shape(lr_seg2))
             
             lr_res = tf.gather(mask,0)*lr_seg1 + tf.gather(mask,1)*lr_seg2
             

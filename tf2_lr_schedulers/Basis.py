@@ -180,9 +180,9 @@ class ConstantLR:
 
     def __call__(self, step):
         LR = tf.convert_to_tensor(self.learning_rate)
-        step = tf.cast(step, tf.int32)
-        step_shape = tf.shape(step)
-        constant = tf.ones(shape = step_shape)*LR
+        #step = tf.cast(step, tf.int32)
+        #step_shape = tf.shape(step)
+        constant = tf.ones(shape = step.shape)*LR
         return constant
     
     def get_config(self):

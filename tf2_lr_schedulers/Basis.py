@@ -143,7 +143,7 @@ def apply_funcs2intervals(step,
     masked_step = masked_step - curr_thres[idx-1]
     func_output += [list_funcs[idx](masked_step)]
       
-    return tf.concat(func_output, axis =0)
+    return tf.squeeze(tf.concat(func_output, axis =0))
   
   
 class ConnectLRs:
@@ -162,7 +162,27 @@ class ConnectLRs:
                              data_type = tf.float32
        )
        return output
-        
+   
+   
+class ConstantLR:
+    def __init__(
+        self, 
+        learning_rate,
+        step_size
+        ):
+        self.learing_rate = learning_rate
+        self.step_size = step_size
+
+    def __call__(self, step):
+        step_length = step.shape[0]
+        constant = tf.repeat(self.learning_rate, step_length)
+        return constant
+    
+    def get_config(self):
+        return {
+        "learning_rate": self.learning_rate,
+        "step_size": self.step_size}
+               
 class Goyal_LR(tf.keras.optimizers.schedules.LearningRateSchedule):
     def __init__(self, 
                  steps_per_epoch, 
@@ -173,16 +193,31 @@ class Goyal_LR(tf.keras.optimizers.schedules.LearningRateSchedule):
         self.initial = WarmUp(init_LR = init_LR,
                 max_LR = 0.1,
                 step_size = 5*steps_per_epoch)
-        self.subseq = StepDecrease(max_LR = 0.1, 
-                        step_size = 100*steps_per_epoch,
-                        change_at = [30, 60, 90]*steps_per_epoch)
-        self.lr_scheduler = ConnectLRs([self.initial, self.subseq])
+        self.constant1 = ConstantLR(learning_rate = 0.1,
+                                    step_size = 30*steps_per_epoch)
+        
+        self.constant2 = ConstantLR(learning_rate = 0.1**2,
+                                    step_size = 30*steps_per_epoch)
+        
+        
+        self.constant3 = ConstantLR(learning_rate = 0.1**3,
+                                    step_size = 30*steps_per_epoch)
+        
+        
+        self.constant4 = ConstantLR(learning_rate = 0.1**4,
+                                    step_size = 10*steps_per_epoch)
+        
+        self.lr_scheduler = ConnectLRs([self.initial, 
+                                        self.constant1,
+                                        self.constant2,
+                                        self.constant3,
+                                        self.constant4])
         self.name = name
 
     def __call__(self, step, optimizer = False):
       with tf.name_scope(self.name):
         return self.lr_scheduler(step)
 
-    
+
     
     

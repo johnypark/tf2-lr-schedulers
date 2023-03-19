@@ -170,16 +170,18 @@ class ConstantLR:
         learning_rate,
         step_size
         ):
-        self.learing_rate = learning_rate
+        self.learning_rate = learning_rate
         self.step_size = step_size
 
     def __call__(self, step):
-        step_length = step.shape[0]
-        constant = tf.repeat(self.learning_rate, step_length)
+        step_shape = step.shape
+        constant = tf.ones(shape = step_shape)*self.learning_rate
         return constant
     
     def get_config(self):
-        return {"step_size": self.step_size}
+        return {
+        "learning_rate": self.learning_rate,
+        "step_size": self.step_size}
                
 class Goyal_LR(tf.keras.optimizers.schedules.LearningRateSchedule):
     def __init__(self, 

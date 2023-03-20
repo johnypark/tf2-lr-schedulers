@@ -281,7 +281,7 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
             
             #print(tf.shape(lr_seg2))
             
-            lr_res = tf.gather(mask,0)*lr_seg1 + tf.gather(mask,1)*lr_seg2
+            lr_res = tf.gather(mask,0)*lr_seg0 + tf.gather(mask,1)*lr_seg1
             
             mode_step = cycle if self.scale_mode == "cycle" else step
 

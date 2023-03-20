@@ -233,6 +233,7 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
             
             compare = tf.math.sign(compare)
             compare = tf.nn.relu(compare)
+            compare = 1.0 - compare
             #compare =  tf.map_fn(
             #    lambda idx: percentage_complete < tf.gather(interval_cumul, idx), 
             #        tf.range(interval_cumul.shape[0]),

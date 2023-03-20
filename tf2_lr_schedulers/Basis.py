@@ -187,6 +187,13 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
     def __init__(
         self,
         cycle_size,
+        list_LR_funcs = [partial(linear_func, 
+                    start = 1e-6,
+                    end = 1e-2),
+                         partial(linear_func, 
+                    start = 1e-2, 
+                    end = 1e-6)
+                    ],
         interval_fractions = [0.3, 0.7], 
         initial_learning_rate = 1e-6,
         maximum_learning_rate = 1e-2,
@@ -206,6 +213,7 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
         self.name = name
         self._total_steps = cycle_size
         self._interval_steps = [ele*self._total_steps for ele in self.interval_fractions]
+        self.list_LR_funcs = list_LR_funcs
         
     def xor_matrix(self, num_edge):
         diag_ones = tf.ones(num_edge)
@@ -245,13 +253,11 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
             #                  lambda: interval_cumul
             #                  )
             
-            compare = tf.vectorized_map(lambda idx: percentage_complete < tf.gather(interval_cumul, idx), 
-                                        tf.range(interval_cumul.shape[0]))
-            #compare =  tf.map_fn(
-            #    lambda idx: percentage_complete < tf.gather(interval_cumul, idx), 
-            #        tf.range(interval_cumul.shape[0]),
-            #        fn_output_signature=tf.bool
-            #        )
+            compare =  tf.map_fn(
+                lambda idx: percentage_complete < tf.gather(interval_cumul, idx), 
+                    tf.range(interval_cumul.shape[0]),
+                    fn_output_signature=tf.bool
+                    )
             
             tsm = self.xor_matrix(num_edge = tf.shape(compare)[0])
             
@@ -278,22 +284,24 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
                 #fn_output_signature = dtype
             )
                 
-            lr_seg1 = linear_func(
-                    step = tf.gather(tensor_normalized_steps,0),
-                    start = initial_learning_rate,
-                    end = maximum_learning_rate
-                    ) 
+            lr_seg0 = self.list_LR_funcs[0](step = tf.gather(tensor_normalized_steps,0))
+                    #linear_func(
+                    #step = tf.gather(tensor_normalized_steps,0),
+                    #start = initial_learning_rate,
+                    #end = maximum_learning_rate
+                    #) 
             
             #print(tf.shape(lr_seg1))
-            lr_seg2 = linear_func(
-                    step = tf.gather(tensor_normalized_steps,1),
-                    start = maximum_learning_rate, 
-                    end = initial_learning_rate,
-                    ) 
+            lr_seg1 = self.list_LR_funcs[1](step = tf.gather(tensor_normalized_steps,1))
+                    #linear_func(
+                    #step = tf.gather(tensor_normalized_steps,1),
+                    #start = maximum_learning_rate, 
+                    #end = initial_learning_rate,
+                    #) 
             
             #print(tf.shape(lr_seg2))
             
-            lr_res = tf.gather(mask,0)*lr_seg1 + tf.gather(mask,1)*lr_seg2
+            lr_res = tf.gather(mask,0)*lr_seg0 + tf.gather(mask,1)*lr_seg1
             
             mode_step = cycle if self.scale_mode == "cycle" else step
 

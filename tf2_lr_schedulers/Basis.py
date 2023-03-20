@@ -254,12 +254,12 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
             
             tsm = self.xor_matrix(num_edge = tf.shape(compare)[0])
             
-            #compare = tf.expand_dims(compare, axis = -1)
+            compare = tf.expand_dims(compare, axis = -1)
             compare = tf.cast(compare, tsm.dtype) #error here: compare = tf.ensure_shape(compare, (2, 9240))
 
             #ValueError: Shape must be rank 2 but is rank 1 for '{{node AdamW/CylicLR/EnsureShape_1}} = EnsureShape[T=DT_FLOAT, shape=[2,9240]](AdamW/CylicLR/Cast_3)' with input shapes: [?].
             mask = tsm@compare
-            #mask = tf.squeeze(mask)
+            mask = tf.squeeze(mask)
             
             _interval_steps = tf.cast(self._interval_steps, 
                                       dtype = utm_ones.dtype)

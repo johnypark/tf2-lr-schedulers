@@ -6,7 +6,7 @@ from functools import partial
 @tf.function(jit_compile=True)
 def constant_func(learning_rate, step):
     step_shape = tf.shape(step)
-    print(step_shape)
+    #print(step_shape)
     output = tf.ones(step_shape)*learning_rate
     return output
 
@@ -245,17 +245,21 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
             #                  lambda: interval_cumul
             #                  )
             
-            compare = tf.vectorized_map(lambda thres: percentage_complete < thres, tf.cast(interval_cumul, dtype))
-                    #fn_output_signature=tf.bool)
+            #compare = tf.vectorized_map(lambda thres: percentage_complete < thres, tf.cast(interval_cumul, dtype))
+            compare =  tf.map_fn(
+                lambda idx: percentage_complete < tf.gather(interval_cumul, idx), 
+                    tf.range(interval_cumul.shape[0]),
+                    fn_output_signature=tf.bool
+                    )
             
             tsm = self.xor_matrix(num_edge = tf.shape(compare)[0])
             
-            compare = tf.expand_dims(compare, axis = -1)
+            #compare = tf.expand_dims(compare, axis = -1)
             compare = tf.cast(compare, tsm.dtype) #error here: compare = tf.ensure_shape(compare, (2, 9240))
 
             #ValueError: Shape must be rank 2 but is rank 1 for '{{node AdamW/CylicLR/EnsureShape_1}} = EnsureShape[T=DT_FLOAT, shape=[2,9240]](AdamW/CylicLR/Cast_3)' with input shapes: [?].
             mask = tsm@compare
-            mask = tf.squeeze(mask)
+            #mask = tf.squeeze(mask)
             
             _interval_steps = tf.cast(self._interval_steps, 
                                       dtype = utm_ones.dtype)
@@ -268,8 +272,8 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
             tensor_normalized_steps = tf.map_fn(
                 lambda idx: (
                     normalized_steps - tf.gather(interval_steps_cumul, idx)
-                    )/tf.gather(_interval_steps, idx)
-                , tf.range(_interval_steps.shape[0]),
+                    )/tf.gather(_interval_steps, idx), 
+                tf.range(_interval_steps.shape[0]),
                 fn_output_signature = dtype
             )
                 
@@ -279,14 +283,14 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
                     end = maximum_learning_rate
                     ) 
             
-            print(tf.shape(lr_seg1))
+            #print(tf.shape(lr_seg1))
             lr_seg2 = linear_func(
                     step = tf.gather(tensor_normalized_steps,1),
                     start = maximum_learning_rate, 
                     end = initial_learning_rate,
                     ) 
             
-            print(tf.shape(lr_seg2))
+            #print(tf.shape(lr_seg2))
             
             lr_res = tf.gather(mask,0)*lr_seg1 + tf.gather(mask,1)*lr_seg2
             

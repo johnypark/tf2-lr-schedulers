@@ -156,31 +156,6 @@ def Goyal_LR(cycle_size,
                name = "Goyal_LR"
                )    
     
-        
-def Cyclical_LR(cycle_size, 
-              initial_learning_rate,
-              maximum_learning_rate,
-              interval_fractions = [0.5, 0.5],
-              scale_mode = "cycle",
-              scale_fn = lambda x:1.0,
-              final_lr_scale = 1.0
-              ):
-    
-    
-    return ComposeLR(
-        initial_learning_rate = maximum_learning_rate,
-        cycle_size = cycle_size,
-        interval_fractions= interval_fractions,
-        list_funcs = [partial(linear_func, start= initial_learning_rate, 
-                              end= maximum_learning_rate), 
-                      partial(linear_func, start =maximum_learning_rate, 
-                              end=initial_learning_rate)],
-        scale_mode= scale_mode,
-        scale_fn = scale_fn,
-        final_lr_scale= final_lr_scale,
-        name= 'Triangluar_Cyclical_LR',
-    )
-
 
 class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
     
@@ -253,20 +228,25 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
             #                  lambda: interval_cumul
             #                  )
             
-            compare =  tf.vectorized_map(
-                lambda idx: percentage_complete < tf.gather(interval_cumul, idx), 
-                    tf.range(interval_cumul.shape[0])#,
-                    #fn_output_signature=tf.bool
-                    )
+            compare = tf.vectorized_map(lambda idx: percentage_complete - tf.gather(interval_cumul, idx), 
+                                        tf.range(interval_cumul.shape[0]))
+            
+            compare = tf.math.sign(compare)
+            compare = tf.nn.relu(compare)
+            #compare =  tf.map_fn(
+            #    lambda idx: percentage_complete < tf.gather(interval_cumul, idx), 
+            #        tf.range(interval_cumul.shape[0]),
+            #        fn_output_signature=tf.bool
+            #        )
             
             tsm = self.xor_matrix(num_edge = tf.shape(compare)[0])
             
-            compare = tf.expand_dims(compare, axis = -1)
+            #compare = tf.expand_dims(compare, axis = -1)
             compare = tf.cast(compare, tsm.dtype) #error here: compare = tf.ensure_shape(compare, (2, 9240))
 
             #ValueError: Shape must be rank 2 but is rank 1 for '{{node AdamW/CylicLR/EnsureShape_1}} = EnsureShape[T=DT_FLOAT, shape=[2,9240]](AdamW/CylicLR/Cast_3)' with input shapes: [?].
             mask = tsm@compare
-            mask = tf.squeeze(mask)
+            #mask = tf.squeeze(mask)
             
             _interval_steps = tf.cast(self._interval_steps, 
                                       dtype = utm_ones.dtype)
@@ -301,7 +281,148 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
             
             #print(tf.shape(lr_seg2))
             
-            lr_res = tf.gather(mask,0)*lr_seg0 + tf.gather(mask,1)*lr_seg1
+            lr_res = tf.gather(mask,0)*lr_seg1 + tf.gather(mask,1)*lr_seg2
+            
+            mode_step = cycle if self.scale_mode == "cycle" else step
+
+            if optimizer == False:
+                lr_res = lr_res * self.scale_fn(mode_step)
+
+            return lr_res
+
+    def get_config(self):
+        return {
+            "initial_learning_rate": self.initial_learning_rate,
+            "cycle_size": self.cycle_size,
+            "scale_mode": self.scale_mode
+        }
+        
+        
+
+class Goyal_style_LR(tf.keras.optimizers.schedules.LearningRateSchedule):
+    
+    def __init__(
+        self,
+        cycle_size,
+        interval_fractions = [0.05, 0.3, 0.3, 0.3, 0.05], 
+        initial_learning_rate = 1e-6,
+        maximum_learning_rate = 1e-2,
+        alpha_factor = 1e-1,
+        scale_mode="cycle",
+        final_lr_scale=1.0,
+        scale_fn=lambda x: 1.0,
+        name="Goyal",
+    ): 
+        
+        """ Goyal et al.-like learning rate scheduler. 
+            SGD LR = 0.1 * (KN)/256 according to Goyal et al. 
+            K: number of workers
+            N: samples per worker
+            B: K*N, batch_size
+            Train for 90 epochs and reduce the learnig rate at 30th, 60th, and 80th epoch
+            This is the warm-up version of Goyal et al LR. 
+            
+        """
+        super().__init__()
+        self.initial_learning_rate = initial_learning_rate
+        self.maximum_learning_rate = maximum_learning_rate
+        self.alpha_factor = alpha_factor
+        self.cycle_size = cycle_size
+        self.scale_fn = scale_fn
+        self.scale_mode = scale_mode
+        self.interval_fractions = interval_fractions
+        self.final_lr_scale = final_lr_scale
+        self.name = name
+        self._total_steps = cycle_size
+        self._interval_steps = [ele*self._total_steps for ele in self.interval_fractions]
+        
+    def xor_matrix(self, num_edge):
+        diag_ones = tf.ones(num_edge)
+        diag_neg_ones = tf.ones(num_edge-1)*(-1)
+        mm = tf.linalg.diag(diag_ones, k = 0) + tf.linalg.diag(diag_neg_ones, k = -1)
+        return tf.reshape(mm, (num_edge, num_edge))
+
+    def __call__(self, step, optimizer=False):
+        with tf.name_scope(self.name or "CyclicLR"):
+            initial_learning_rate = tf.convert_to_tensor(self.initial_learning_rate, name="initial_learning_rate")
+            dtype = initial_learning_rate.dtype
+            maximum_learning_rate = tf.cast(self.maximum_learning_rate, dtype)
+            step = tf.cast(step, dtype)
+            total_steps = tf.cast(self._total_steps, dtype)
+            cycle_progress = step / total_steps
+            cycle = tf.floor(1 + cycle_progress)
+            normalized_steps = step - (cycle -1)*total_steps
+            percentage_complete = 1.0 - tf.abs(cycle - cycle_progress)
+            
+            utm_ones = tf.linalg.band_part(tf.ones(
+                                        (len(self.interval_fractions),
+                                        len(self.interval_fractions))
+                                      ), 0, -1)
+            
+            interval_cumul = tf.expand_dims(
+                                  tf.cast(
+                                      self.interval_fractions, 
+                                      dtype = utm_ones.dtype),
+                                      axis = 0)@utm_ones
+
+            interval_cumul = tf.squeeze(interval_cumul)
+            compare = tf.vectorized_map(lambda idx: percentage_complete < tf.gather(interval_cumul, idx), 
+                                        tf.range(interval_cumul.shape[0]))
+            
+            tsm = self.xor_matrix(num_edge = tf.shape(compare)[0])
+            
+            compare = tf.expand_dims(compare, axis = -1) # trick to run it on TPU
+            compare = tf.cast(compare, tsm.dtype) 
+            mask = tsm@compare
+            mask = tf.squeeze(mask) #trick to run it on TPU
+            
+            _interval_steps = tf.cast(self._interval_steps, 
+                                      dtype = utm_ones.dtype)
+
+            interval_steps_cumul = tf.expand_dims( _interval_steps,
+                                      axis = 0)@utm_ones
+            interval_steps_cumul = tf.squeeze(interval_steps_cumul) 
+            interval_steps_cumul = tf.concat([tf.reshape(tf.constant(0.0),(1,)), interval_steps_cumul], axis = -1)     
+            
+            tensor_normalized_steps = tf.vectorized_map(
+                lambda idx: (
+                    normalized_steps - tf.gather(interval_steps_cumul, idx)
+                    )/tf.gather(_interval_steps, idx), 
+                tf.range(_interval_steps.shape[0])
+            )
+                
+            warm_up = linear_func(
+                    step = tf.gather(tensor_normalized_steps,0),
+                    start = initial_learning_rate,
+                    end = maximum_learning_rate
+                    ) 
+            
+            peak_lr = constant_func(
+                    step = tf.gather(tensor_normalized_steps,1),
+                    learning_rate = maximum_learning_rate
+                    )
+            
+            first_decrease = linear_func(
+                    step = tf.gather(tensor_normalized_steps,1),
+                    learning_rate = maximum_learning_rate * self.alpha_factor
+                    ) 
+            
+            second_decrease = linear_func(
+                    step = tf.gather(tensor_normalized_steps,1),
+                    start = maximum_learning_rate * self.alpha_factor**2
+                    ) 
+            
+            third_decrease = linear_func(
+                    step = tf.gather(tensor_normalized_steps,1),
+                    start = maximum_learning_rate *self.alpha_factor**3, 
+                    end = initial_learning_rate,
+                    ) 
+            
+            lr_res = tf.gather(mask,0)*warm_up + \
+                     tf.gather(mask,1)*peak_lr + \
+                     tf.gather(mask, 2)*first_decrease + \
+                     tf.gather(mask, 3)*second_decrease + \
+                     tf.gather(mask, 4)*third_decrease
             
             mode_step = cycle if self.scale_mode == "cycle" else step
 

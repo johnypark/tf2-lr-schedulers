@@ -245,12 +245,13 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
             #                  lambda: interval_cumul
             #                  )
             
-            #compare = tf.vectorized_map(lambda thres: percentage_complete < thres, tf.cast(interval_cumul, dtype))
-            compare =  tf.map_fn(
-                lambda idx: percentage_complete < tf.gather(interval_cumul, idx), 
-                    tf.range(interval_cumul.shape[0]),
-                    fn_output_signature=tf.bool
-                    )
+            compare = tf.vectorized_map(lambda idx: percentage_complete < tf.gahter(interval_cumul, idx), 
+                                        tf.range(interval_cumul.shape[0]))
+            #compare =  tf.map_fn(
+            #    lambda idx: percentage_complete < tf.gather(interval_cumul, idx), 
+            #        tf.range(interval_cumul.shape[0]),
+            #        fn_output_signature=tf.bool
+            #        )
             
             tsm = self.xor_matrix(num_edge = tf.shape(compare)[0])
             
@@ -269,12 +270,12 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
             interval_steps_cumul = tf.squeeze(interval_steps_cumul) 
             interval_steps_cumul = tf.concat([tf.reshape(tf.constant(0.0),(1,)), interval_steps_cumul], axis = -1)     
             
-            tensor_normalized_steps = tf.map_fn(
+            tensor_normalized_steps = tf.vectorized_map(#map_fn(
                 lambda idx: (
                     normalized_steps - tf.gather(interval_steps_cumul, idx)
                     )/tf.gather(_interval_steps, idx), 
-                tf.range(_interval_steps.shape[0]),
-                fn_output_signature = dtype
+                tf.range(_interval_steps.shape[0])#,
+                #fn_output_signature = dtype
             )
                 
             lr_seg1 = linear_func(

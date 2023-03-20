@@ -219,9 +219,6 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
             dtype = initial_learning_rate.dtype
             maximum_learning_rate = tf.cast(self.maximum_learning_rate, dtype)
             step = tf.cast(step, dtype)
-            #step = tf.cond( tf.rank(step) == 0,
-            #lambda: tf.expand_dims(step, axis = 0),
-            #lambda: step)
             total_steps = tf.cast(self._total_steps, dtype)
             cycle_progress = step / total_steps
             cycle = tf.floor(1 + cycle_progress)
@@ -240,27 +237,21 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
                                       axis = 0)@utm_ones
 
             interval_cumul = tf.squeeze(interval_cumul)
-            #interval_cumul = tf.cond(tf.reduce_max(interval_cumul) < 1.0,
-            #                  lambda: tf.concat([interval_cumul, tf.reshape(tf.constant(1.0),(1,))], axis = -1),
-            #                  lambda: interval_cumul
-            #                  )
             
             compare = tf.vectorized_map(lambda idx: percentage_complete < tf.gather(interval_cumul, idx), 
                                         tf.range(interval_cumul.shape[0]))
-            #compare =  tf.map_fn(
-            #    lambda idx: percentage_complete < tf.gather(interval_cumul, idx), 
-            #        tf.range(interval_cumul.shape[0]),
-            #        fn_output_signature=tf.bool
-            #        )
             
             tsm = self.xor_matrix(num_edge = tf.shape(compare)[0])
             
             compare = tf.expand_dims(compare, axis = -1)
-            compare = tf.cast(compare, tsm.dtype) #error here: compare = tf.ensure_shape(compare, (2, 9240))
-
-            #ValueError: Shape must be rank 2 but is rank 1 for '{{node AdamW/CylicLR/EnsureShape_1}} = EnsureShape[T=DT_FLOAT, shape=[2,9240]](AdamW/CylicLR/Cast_3)' with input shapes: [?].
-            mask = tsm@compare
-            mask = tf.squeeze(mask)
+            compare = tf.cast(compare, tsm.dtype) 
+            
+            try:
+                mask = tsm@compare
+                mask = tf.squeeze(mask) #trick to run it on TPU
+            
+            except:
+                mask = tsm@tf.squeze(compare)
             
             _interval_steps = tf.cast(self._interval_steps, 
                                       dtype = utm_ones.dtype)
@@ -270,12 +261,11 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
             interval_steps_cumul = tf.squeeze(interval_steps_cumul) 
             interval_steps_cumul = tf.concat([tf.reshape(tf.constant(0.0),(1,)), interval_steps_cumul], axis = -1)     
             
-            tensor_normalized_steps = tf.vectorized_map(#map_fn(
+            tensor_normalized_steps = tf.vectorized_map(
                 lambda idx: (
                     normalized_steps - tf.gather(interval_steps_cumul, idx)
                     )/tf.gather(_interval_steps, idx), 
-                tf.range(_interval_steps.shape[0])#,
-                #fn_output_signature = dtype
+                tf.range(_interval_steps.shape[0])
             )
                 
             lr_seg1 = linear_func(
@@ -284,14 +274,11 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
                     end = maximum_learning_rate
                     ) 
             
-            #print(tf.shape(lr_seg1))
             lr_seg2 = linear_func(
                     step = tf.gather(tensor_normalized_steps,1),
                     start = maximum_learning_rate, 
                     end = initial_learning_rate,
                     ) 
-            
-            #print(tf.shape(lr_seg2))
             
             lr_res = tf.gather(mask,0)*lr_seg1 + tf.gather(mask,1)*lr_seg2
             
@@ -309,8 +296,6 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
             "scale_mode": self.scale_mode
         }
         
-        
-
 class Goyal_style_LR(tf.keras.optimizers.schedules.LearningRateSchedule):
     
     def __init__(
@@ -434,8 +419,8 @@ class Goyal_style_LR(tf.keras.optimizers.schedules.LearningRateSchedule):
                     end = initial_learning_rate,
                     ) 
             
-            lr_res = tf.gather(mask,0)*warm_up + \
-                     tf.gather(mask,1)*peak_lr + \
+            lr_res = tf.gather(mask, 0)*warm_up + \
+                     tf.gather(mask, 1)*peak_lr + \
                      tf.gather(mask, 2)*first_decrease + \
                      tf.gather(mask, 3)*second_decrease + \
                      tf.gather(mask, 4)*third_decrease

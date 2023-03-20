@@ -194,7 +194,6 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
         scale_fn=lambda x: 1.0,
         name="CylicLR",
     ):  
-        
         super().__init__()
         self.initial_learning_rate = initial_learning_rate
         self.maximum_learning_rate = maximum_learning_rate
@@ -207,12 +206,11 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
         self._total_steps = cycle_size
         self._interval_steps = [ele*self._total_steps for ele in self.interval_fractions]
         
-
     def xor_matrix(self, num_edge):
         diag_ones = tf.ones(num_edge)
         diag_neg_ones = tf.ones(num_edge-1)*(-1)
-        return tf.linalg.diag(diag_ones, k = 0) + tf.linalg.diag(diag_neg_ones, k = -1)
-
+        mm = tf.linalg.diag(diag_ones, k = 0) + tf.linalg.diag(diag_neg_ones, k = -1)
+        return tf.reshape(mm, (num_edge, num_edge))
 
     def __call__(self, step, optimizer=False):
         with tf.name_scope(self.name or "CyclicLR"):
@@ -248,7 +246,8 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
             compare = tf.map_fn(lambda thres: percentage_complete < thres, tf.cast(interval_cumul, dtype),
                     fn_output_signature=tf.bool)
             tsm = self.xor_matrix(num_edge = tf.shape(compare)[0])
-            mask = tsm@tf.cast(compare, tsm.dtype) 
+            compare = tf.cast(compare, tsm.dtype)
+            mask = tsm@compare
             
             _interval_steps = tf.cast(self._interval_steps, 
                                       dtype = utm_ones.dtype)

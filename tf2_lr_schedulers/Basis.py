@@ -253,10 +253,10 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
             #                  lambda: interval_cumul
             #                  )
             
-            compare =  tf.map_fn(
+            compare =  tf.vectorized_map(
                 lambda idx: percentage_complete < tf.gather(interval_cumul, idx), 
-                    tf.range(interval_cumul.shape[0]),
-                    fn_output_signature=tf.bool
+                    tf.range(interval_cumul.shape[0])#,
+                    #fn_output_signature=tf.bool
                     )
             
             tsm = self.xor_matrix(num_edge = tf.shape(compare)[0])

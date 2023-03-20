@@ -404,17 +404,17 @@ class Goyal_style_LR(tf.keras.optimizers.schedules.LearningRateSchedule):
                     )
             
             first_decrease = linear_func(
-                    step = tf.gather(tensor_normalized_steps,1),
+                    step = tf.gather(tensor_normalized_steps,2),
                     learning_rate = maximum_learning_rate * self.alpha_factor
                     ) 
             
             second_decrease = linear_func(
-                    step = tf.gather(tensor_normalized_steps,1),
+                    step = tf.gather(tensor_normalized_steps,3),
                     start = maximum_learning_rate * self.alpha_factor**2
                     ) 
             
             third_decrease = linear_func(
-                    step = tf.gather(tensor_normalized_steps,1),
+                    step = tf.gather(tensor_normalized_steps,4),
                     start = maximum_learning_rate *self.alpha_factor**3, 
                     end = initial_learning_rate,
                     ) 

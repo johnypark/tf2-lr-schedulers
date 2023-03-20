@@ -251,7 +251,7 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
                 mask = tf.squeeze(mask) #trick to run it on TPU
             
             except:
-                mask = tsm@tf.squeze(compare)
+                mask = tsm@tf.squeeze(compare)
             
             _interval_steps = tf.cast(self._interval_steps, 
                                       dtype = utm_ones.dtype)
@@ -375,7 +375,7 @@ class Goyal_style_LR(tf.keras.optimizers.schedules.LearningRateSchedule):
                 mask = tf.squeeze(mask) #trick to run it on TPU
             
             except:
-                mask = tsm@tf.squeze(compare)
+                mask = tsm@tf.squeeze(compare)
             
             _interval_steps = tf.cast(self._interval_steps, 
                                       dtype = utm_ones.dtype)

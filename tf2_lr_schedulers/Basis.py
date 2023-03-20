@@ -2,6 +2,7 @@
 import numpy as np
 import tensorflow as tf
 from functools import partial
+
 @tf.function(jit_compile=True)
 def constant_func(learning_rate, step):
     step_shape = tf.shape(step)

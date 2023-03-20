@@ -249,7 +249,7 @@ class CyclicLR(tf.keras.optimizers.schedules.LearningRateSchedule):
             tsm = self.xor_matrix(num_edge = tf.shape(compare)[0])
             compare = tf.cast(compare, tsm.dtype)
             tsm = tf.ensure_shape(tsm, (2,2))
-            compare = tf.ensure_shape(compare, (2, tf.shape(step)))
+            compare = tf.ensure_shape(compare, (2, step.shape))
             mask = tsm@compare
             
             _interval_steps = tf.cast(self._interval_steps, 

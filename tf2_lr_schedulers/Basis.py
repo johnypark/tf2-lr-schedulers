@@ -385,8 +385,12 @@ class Goyal_style_LR(tf.keras.optimizers.schedules.LearningRateSchedule):
             
             compare = tf.expand_dims(compare, axis = -1) # trick to run it on TPU
             compare = tf.cast(compare, tsm.dtype) 
-            mask = tsm@compare
-            mask = tf.squeeze(mask) #trick to run it on TPU
+            try:
+                mask = tsm@compare
+                mask = tf.squeeze(mask) #trick to run it on TPU
+            
+            except:
+                mask = tsm@tf.squeze(compare)
             
             _interval_steps = tf.cast(self._interval_steps, 
                                       dtype = utm_ones.dtype)

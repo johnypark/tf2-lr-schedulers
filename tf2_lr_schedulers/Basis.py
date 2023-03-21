@@ -12,7 +12,7 @@ def constant_func(learning_rate, step):
 
 
 @tf.function(jit_compile=True)
-def CosineDecay(step, start_lr, gamma_factor = 5e-2):
+def CosDecay(step, start_lr, gamma_factor = 5e-2):
     x = step
     x_radian = tf.constant(np.pi)/2.0 * x
     intercept = start_lr*gamma_factor
@@ -21,7 +21,7 @@ def CosineDecay(step, start_lr, gamma_factor = 5e-2):
     return cosine_Q1
 
 @tf.function(jit_compile=True)
-def SineDecay(step, start_lr, gamma_factor = 5e-2):
+def SinDecay(step, start_lr, gamma_factor = 5e-2):
     x = step
     x_radian = tf.constant(np.pi)/2.0 * x
     intercept = start_lr*gamma_factor

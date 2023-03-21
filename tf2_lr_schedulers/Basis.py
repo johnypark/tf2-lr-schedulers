@@ -4,7 +4,7 @@ import tensorflow as tf
 from functools import partial
 
 @tf.function(jit_compile=True)
-def constant_func(learning_rate, step):
+def constant_func(step, learning_rate):
     step_shape = tf.shape(step)
     #print(step_shape)
     output = tf.ones(step_shape)*learning_rate
@@ -12,7 +12,8 @@ def constant_func(learning_rate, step):
 
 
 @tf.function(jit_compile=True)
-def CosDecay(step, start_lr, gamma_factor = 5e-2):
+def cosine_decay(step, learning_rate, gamma_factor = 5e-2):
+    start_lr = learning_rate
     x = step
     x_radian = tf.constant(np.pi)/2.0 * x
     intercept = start_lr*gamma_factor
@@ -21,7 +22,8 @@ def CosDecay(step, start_lr, gamma_factor = 5e-2):
     return cosine_Q1
 
 @tf.function(jit_compile=True)
-def SinDecay(step, start_lr, gamma_factor = 5e-2):
+def sine_decay(step, learning_rate, gamma_factor = 5e-2):
+    start_lr = learning_rate
     x = step
     x_radian = tf.constant(np.pi)/2.0 * x
     intercept = start_lr*gamma_factor
@@ -329,6 +331,7 @@ class Goyal_style_LR(tf.keras.optimizers.schedules.LearningRateSchedule):
         final_lr_scale=1.0,
         scale_fn=lambda x: 1.0,
         name="Goyal",
+        CosineDecay = False
     ): 
         
         """ Goyal et al.-like learning rate scheduler. 
@@ -352,6 +355,7 @@ class Goyal_style_LR(tf.keras.optimizers.schedules.LearningRateSchedule):
         self.name = name
         self._total_steps = cycle_size
         self._interval_steps = [ele*self._total_steps for ele in self.interval_fractions]
+        self.CosineDecay = CosineDecay
         
     def xor_matrix(self, num_edge):
         diag_ones = tf.ones(num_edge)
@@ -411,6 +415,11 @@ class Goyal_style_LR(tf.keras.optimizers.schedules.LearningRateSchedule):
                     )/tf.gather(_interval_steps, idx), 
                 tf.range(_interval_steps.shape[0])
             )
+            
+            if self.CosineDecay:
+                decay_func = cosine_decay
+            else:
+                decay_func = constant_func
                 
             warm_up = linear_func(
                     step = tf.gather(tensor_normalized_steps,0),
@@ -418,22 +427,22 @@ class Goyal_style_LR(tf.keras.optimizers.schedules.LearningRateSchedule):
                     end = maximum_learning_rate
                     ) 
             
-            peak_lr = constant_func(
+            peak_lr = decay_func(
                     step = tf.gather(tensor_normalized_steps,1),
                     learning_rate = maximum_learning_rate
                     )
             
-            first_decrease = constant_func(
+            first_decrease = decay_func(
                     step = tf.gather(tensor_normalized_steps,2),
                     learning_rate = maximum_learning_rate * self.alpha_factor
                     ) 
             
-            second_decrease = constant_func(
+            second_decrease = decay_func(
                     step = tf.gather(tensor_normalized_steps,3),
                     learning_rate = maximum_learning_rate * self.alpha_factor**2
                     ) 
             
-            third_decrease = constant_func(
+            third_decrease = decay_func(
                     step = tf.gather(tensor_normalized_steps,4),
                     learning_rate = maximum_learning_rate *self.alpha_factor**3
                     ) 

@@ -10,6 +10,26 @@ def constant_func(learning_rate, step):
     output = tf.ones(step_shape)*learning_rate
     return output
 
+
+@tf.function(jit_compile=True)
+def CosineDecay(step, start_lr, gamma_factor = 5e-2):
+    x = step
+    x_radian = tf.constant(np.pi)/2.0 * x
+    intercept = start_lr*gamma_factor
+    beta = start_lr*(1.0 - gamma_factor)
+    cosine_Q1 = beta * tf.math.cos(x_radian) + intercept
+    return cosine_Q1
+
+@tf.function(jit_compile=True)
+def SineDecay(step, start_lr, gamma_factor = 5e-2):
+    x = step
+    x_radian = tf.constant(np.pi)/2.0 * x
+    intercept = start_lr*gamma_factor
+    beta = start_lr*(1.0 - gamma_factor)
+    sine_Q1_reverse = beta * tf.math.sin(x_radian) + intercept
+    return sine_Q1_reverse
+
+
 @tf.function(jit_compile=True)
 def cosine_annealing_func(step, start, end):
     x = step 
